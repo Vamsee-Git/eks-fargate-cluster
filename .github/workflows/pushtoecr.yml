@@ -1,0 +1,56 @@
+name: Build and Push Docker Images to ECR
+
+on: workflow_dispatch
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the code
+      - name: Checkout code
+        uses: actions/checkout@v2
+      # Set up AWS credentials
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: arn:aws:iam::664418994073:role/eks-github-role
+          aws-region: ap-south-1
+          id-token: true
+        
+
+      # Step 3: Log in to Amazon ECR
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # Step 4: Create ECR repositories (if they don't exist)
+      - name: Create ECR Repositories
+        run: |
+          aws ecr describe-repositories --repository-names patient-service|| \
+            aws ecr create-repository --repository-name patient-service
+          aws ecr describe-repositories --repository-names appointment-service || \
+            aws ecr create-repository --repository-name appointment-service
+      # Step 5: Build Docker images for microservices
+      - name: Build Docker image for microservice1
+        run: |
+          docker build -t patient-service ./App/patient  # Assuming Dockerfile is in the `microservice1` folder
+          
+      - name: Build Docker image for microservice2
+        run: |
+          docker build -t appointment-service ./App/appointment  # Assuming Dockerfile is in the `microservice2` folder
+      # Step 6: Tag and push Docker images to ECR
+      - name: Push Docker image for microservice1
+        run: |
+          ECR_URI=$(aws ecr describe-repositories --repository-name patient-service --query 'repositories[0].repositoryUri' --output text)
+          docker tag patient-service:latest $ECR_URI:latest
+          docker push $ECR_URI:latest
+      - name: Push Docker image for microservice2
+        run: |
+          ECR_URI=$(aws ecr describe-repositories --repository-name appointment-service --query 'repositories[0].repositoryUri' --output text)
+          docker tag appointment-service:latest $ECR_URI:latest
+          docker push $ECR_URI:latest
