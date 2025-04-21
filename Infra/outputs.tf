@@ -29,4 +29,6 @@ output "eks_cluster_arn" {
 }
 
 output "eks_role_arn" {
-  description
+  description = "ARN of the EKS IAM role"
+  value       = module.eks.eks_role_arn
+}
